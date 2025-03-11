@@ -8,94 +8,17 @@ interface VideoPlayerProps {
   video: VideoType;
   isActive: boolean;
   onLoad?: () => void;
-  prevVideo?: VideoType;
-  nextVideo?: VideoType;
-  isScrolling?: boolean;
-  scrollDirection?: "up" | "down" | null;
 }
 
 export default function VideoPlayer({
   video,
   isActive,
   onLoad,
-  prevVideo,
-  nextVideo,
-  isScrolling = false,
-  scrollDirection = null,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const prevVideoRef = useRef<HTMLVideoElement>(null);
-  const nextVideoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showPreview, setShowPreview] = useState(!!video.previewUrl);
-  const [isBufferingNext, setIsBufferingNext] = useState(false);
-  const [fadeOutPreview, setFadeOutPreview] = useState(false);
-
-  // スクロール中の動画準備
-  useEffect(() => {
-    // スクロール中で、下方向にスクロールしている場合、次の動画を準備
-    if (
-      isScrolling &&
-      scrollDirection === "down" &&
-      nextVideo &&
-      nextVideoRef.current
-    ) {
-      setIsBufferingNext(true);
-
-      // 次の動画のバッファリングを強化
-      nextVideoRef.current.preload = "auto";
-
-      // 少しだけ再生して止める（バッファリングを促進）
-      const bufferNextVideo = async () => {
-        try {
-          nextVideoRef.current!.currentTime = 0;
-          await nextVideoRef.current!.play();
-          // 少し再生したら一時停止
-          setTimeout(() => {
-            if (nextVideoRef.current) {
-              nextVideoRef.current.pause();
-              nextVideoRef.current.currentTime = 0;
-            }
-          }, 100);
-        } catch (error) {
-          console.error("Error buffering next video during scroll:", error);
-        }
-      };
-
-      bufferNextVideo();
-    }
-
-    // スクロール中で、上方向にスクロールしている場合、前の動画を準備
-    if (
-      isScrolling &&
-      scrollDirection === "up" &&
-      prevVideo &&
-      prevVideoRef.current
-    ) {
-      // 前の動画のバッファリングを強化
-      prevVideoRef.current.preload = "auto";
-
-      // 少しだけ再生して止める（バッファリングを促進）
-      const bufferPrevVideo = async () => {
-        try {
-          prevVideoRef.current!.currentTime = 0;
-          await prevVideoRef.current!.play();
-          // 少し再生したら一時停止
-          setTimeout(() => {
-            if (prevVideoRef.current) {
-              prevVideoRef.current.pause();
-              prevVideoRef.current.currentTime = 0;
-            }
-          }, 100);
-        } catch (error) {
-          console.error("Error buffering previous video during scroll:", error);
-        }
-      };
-
-      bufferPrevVideo();
-    }
-  }, [isScrolling, scrollDirection, nextVideo, prevVideo]);
+  const [showPreview, setShowPreview] = useState(true);
 
   // 動画の読み込みを最適化
   useEffect(() => {
@@ -106,76 +29,20 @@ export default function VideoPlayer({
     if (!isActive) {
       videoElement.preload = "metadata";
       // 非アクティブになったらプレビュー状態をリセット
-      setFadeOutPreview(false);
-      setShowPreview(!!video.previewUrl);
-      setIsBufferingNext(false);
+      setShowPreview(true);
+      setIsLoaded(false);
+      setIsPlaying(false);
     } else {
       videoElement.preload = "auto";
 
       // モバイルでの自動再生を強制
       videoElement.load();
     }
-  }, [isActive, video.previewUrl]);
-
-  // 前後の動画をプリロード
-  useEffect(() => {
-    // 前の動画をプリロード
-    if (prevVideo && prevVideoRef.current) {
-      prevVideoRef.current.preload = "auto";
-      prevVideoRef.current.load();
-    }
-
-    // 次の動画をプリロード
-    if (nextVideo && nextVideoRef.current) {
-      nextVideoRef.current.preload = "auto";
-      nextVideoRef.current.load();
-    }
-  }, [prevVideo, nextVideo]);
-
-  // 現在の動画が終わりに近づいたら次の動画をバッファリング開始
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    const nextVideoElement = nextVideoRef.current;
-
-    if (!isActive || !videoElement || !nextVideoElement || !nextVideo) return;
-
-    const handleTimeUpdate = () => {
-      // 動画の残り時間が3秒未満になったら次の動画のバッファリングを強化
-      const remainingTime = videoElement.duration - videoElement.currentTime;
-      if (remainingTime < 3 && !isBufferingNext) {
-        setIsBufferingNext(true);
-
-        // 次の動画のバッファリングを強化
-        nextVideoElement.preload = "auto";
-
-        // 少しだけ再生して止める（バッファリングを促進）
-        const bufferNextVideo = async () => {
-          try {
-            nextVideoElement.currentTime = 0;
-            await nextVideoElement.play();
-            // 少し再生したら一時停止
-            setTimeout(() => {
-              nextVideoElement.pause();
-              nextVideoElement.currentTime = 0;
-            }, 100);
-          } catch (error) {
-            console.error("Error buffering next video:", error);
-          }
-        };
-
-        bufferNextVideo();
-      }
-    };
-
-    videoElement.addEventListener("timeupdate", handleTimeUpdate);
-    return () => {
-      videoElement.removeEventListener("timeupdate", handleTimeUpdate);
-    };
-  }, [isActive, nextVideo, isBufferingNext]);
+  }, [isActive]);
 
   // プレビュー動画の管理
   useEffect(() => {
-    if (!video.previewUrl || !isActive) return;
+    if (!isActive) return;
 
     // アクティブになったときにプレビュー画像を表示
     setShowPreview(true);
@@ -183,7 +50,7 @@ export default function VideoPlayer({
     return () => {
       // 非アクティブになったときにクリーンアップ
     };
-  }, [isActive, video.previewUrl]);
+  }, [isActive]);
 
   // メイン動画の再生管理
   useEffect(() => {
@@ -214,8 +81,6 @@ export default function VideoPlayer({
       setIsPlaying(false);
       // Reset to the beginning so it can be played from the start when scrolled back
       videoElement.currentTime = 0;
-      // 非アクティブになったらバッファリング状態をリセット
-      setIsBufferingNext(false);
     }
   }, [isActive]);
 
@@ -225,13 +90,10 @@ export default function VideoPlayer({
       await videoElement.play();
       setIsPlaying(true);
 
-      // メイン動画が再生開始したらプレビューをフェードアウト
-      setFadeOutPreview(true);
-
-      // フェードアウト完了後にプレビューを非表示に
+      // プレビューを非表示に
       setTimeout(() => {
         setShowPreview(false);
-      }, 500); // トランジション時間と同じ
+      }, 500);
     } catch (error) {
       console.error("Error playing video:", error);
       setIsPlaying(false);
@@ -256,70 +118,16 @@ export default function VideoPlayer({
     }
   };
 
-  // スクロール方向に基づいて次/前の動画を事前に再生準備
-  useEffect(() => {
-    // スクロール中で、かつアクティブな動画の場合のみ処理
-    if (!isActive || !isScrolling) return;
-
-    // 下方向スクロール時は次の動画を準備
-    if (scrollDirection === "down" && nextVideo) {
-      // 次の動画が表示される可能性が高いので、より積極的にプリロード
-      const nextVideoElement = nextVideoRef.current;
-      if (nextVideoElement) {
-        nextVideoElement.preload = "auto";
-        nextVideoElement.load();
-
-        // 次の動画が表示される直前に再生準備を開始
-        const prepareNextVideo = async () => {
-          try {
-            // 少しだけ再生して止める（バッファリングを促進）
-            nextVideoElement.currentTime = 0;
-            await nextVideoElement.play();
-            setTimeout(() => {
-              nextVideoElement.pause();
-              nextVideoElement.currentTime = 0;
-            }, 50);
-          } catch (error) {
-            console.error("Error preparing next video:", error);
-          }
-        };
-
-        prepareNextVideo();
-      }
-    }
-
-    // 上方向スクロール時は前の動画を準備
-    if (scrollDirection === "up" && prevVideo) {
-      const prevVideoElement = prevVideoRef.current;
-      if (prevVideoElement) {
-        prevVideoElement.preload = "auto";
-        prevVideoElement.load();
-
-        // 前の動画が表示される直前に再生準備を開始
-        const preparePrevVideo = async () => {
-          try {
-            // 少しだけ再生して止める（バッファリングを促進）
-            prevVideoElement.currentTime = 0;
-            await prevVideoElement.play();
-            setTimeout(() => {
-              prevVideoElement.pause();
-              prevVideoElement.currentTime = 0;
-            }, 50);
-          } catch (error) {
-            console.error("Error preparing previous video:", error);
-          }
-        };
-
-        preparePrevVideo();
-      }
-    }
-  }, [isActive, isScrolling, scrollDirection, nextVideo, prevVideo]);
+  // プレビュー画像またはカバー画像のURLを取得
+  const getPreviewImageUrl = () => {
+    return video.previewUrl || video.coverImage;
+  };
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-transparent">
       <div className="relative w-[80%] h-[80%] overflow-hidden rounded-2xl shadow-lg">
         {/* サムネイルプレビュー (動画が読み込まれるまで表示) */}
-        {!isLoaded && !isPlaying && video.coverImage && (
+        {!isPlaying && video.coverImage && (
           <div className="absolute inset-0 z-0">
             <Image
               src={video.coverImage}
@@ -336,14 +144,10 @@ export default function VideoPlayer({
         )}
 
         {/* 低解像度のプレビュー画像 (メイン動画が再生されるまで表示) */}
-        {showPreview && video.previewUrl && (
-          <div
-            className={`absolute inset-0 z-10 ${
-              fadeOutPreview ? "opacity-0" : "opacity-100"
-            } transition-opacity duration-500`}
-          >
+        {showPreview && getPreviewImageUrl() && (
+          <div className={`absolute inset-0 z-10`}>
             <Image
-              src={video.previewUrl}
+              src={getPreviewImageUrl()!}
               alt={video.description || "Video preview"}
               fill
               sizes="100vw"
@@ -368,30 +172,6 @@ export default function VideoPlayer({
           onLoadedData={handleLoadedData}
         />
 
-        {/* 前の動画 (非表示でプリロード) */}
-        {prevVideo && (
-          <video
-            ref={prevVideoRef}
-            src={`/api/video/${prevVideo.id}`}
-            className="hidden"
-            muted
-            playsInline
-            preload="auto"
-          />
-        )}
-
-        {/* 次の動画 (非表示でプリロード) */}
-        {nextVideo && (
-          <video
-            ref={nextVideoRef}
-            src={`/api/video/${nextVideo.id}`}
-            className="hidden"
-            muted
-            playsInline
-            preload="auto"
-          />
-        )}
-
         {/* User information and video description */}
         <div className="absolute bottom-6 left-4 right-4 z-10 flex flex-col text-white pb-safe">
           <div className="flex items-center mb-2">
@@ -413,8 +193,8 @@ export default function VideoPlayer({
           <p className="text-xs text-gray-300 max-w-[90%]">{video.url}</p>
         </div>
 
-        {/* Loading indicator */}
-        {!isLoaded && !isPlaying && (
+        {/* Loading indicator - only show if no preview or cover image is available */}
+        {!isLoaded && !isPlaying && !getPreviewImageUrl() && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-10 rounded-2xl">
             <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
           </div>
