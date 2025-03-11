@@ -72,6 +72,7 @@ export default function VideoPlayer({
         {video.description && (
           <p className="text-sm max-w-[80%]">{video.description}</p>
         )}
+        <p className="text-sm max-w-[80%]">{video.url}</p>
       </div>
 
       {/* Loading indicator */}
