@@ -55,7 +55,7 @@ export default function VideoPlayer({
       />
 
       {/* User information and video description */}
-      <div className="absolute bottom-6 left-4 z-10 flex flex-col text-white">
+      <div className="absolute bottom-6 left-4 right-4 z-10 flex flex-col text-white pb-safe">
         <div className="flex items-center mb-2">
           {video.userAvatar && (
             <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
@@ -70,9 +70,9 @@ export default function VideoPlayer({
         </div>
 
         {video.description && (
-          <p className="text-sm max-w-[80%]">{video.description}</p>
+          <p className="text-sm max-w-[90%] mb-2">{video.description}</p>
         )}
-        <p className="text-sm max-w-[80%]">{video.url}</p>
+        <p className="text-xs text-gray-300 max-w-[90%]">{video.url}</p>
       </div>
 
       {/* Loading indicator */}

@@ -10,9 +10,12 @@ interface VideoFeedProps {
 
 export default function VideoFeed({ videos }: VideoFeedProps) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const [loadedVideos, setLoadedVideos] = useState<Set<string>>(
-    new Set([videos[0]?.id])
-  );
+  const [loadedVideos, setLoadedVideos] = useState<Set<string>>(() => {
+    const initialLoadedVideos = new Set([videos[0]?.id]);
+    if (videos[1]?.id) initialLoadedVideos.add(videos[1].id);
+    if (videos[2]?.id) initialLoadedVideos.add(videos[2].id);
+    return initialLoadedVideos;
+  });
   const feedContainerRef = useRef<HTMLDivElement>(null);
 
   // Scroll detection and active video determination
@@ -29,14 +32,18 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
       if (index !== activeVideoIndex && index >= 0 && index < videos.length) {
         setActiveVideoIndex(index);
 
-        // Preload the next video
-        if (index + 1 < videos.length) {
-          setLoadedVideos((prev) => new Set([...prev, videos[index + 1].id]));
+        // Preload the next two videos
+        for (let i = 1; i <= 2; i++) {
+          if (index + i < videos.length) {
+            setLoadedVideos((prev) => new Set([...prev, videos[index + i].id]));
+          }
         }
 
-        // Preload the previous video (considering the possibility of the user scrolling up)
-        if (index - 1 >= 0) {
-          setLoadedVideos((prev) => new Set([...prev, videos[index - 1].id]));
+        // Preload the previous two videos
+        for (let i = 1; i <= 2; i++) {
+          if (index - i >= 0) {
+            setLoadedVideos((prev) => new Set([...prev, videos[index - i].id]));
+          }
         }
       }
     };
@@ -55,18 +62,20 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
   return (
     <div
       ref={feedContainerRef}
-      className="h-screen overflow-y-scroll snap-y snap-mandatory"
+      className="h-screen overflow-y-scroll snap-y snap-mandatory overscroll-y-contain"
     >
       {videos.map((video, index) => (
         <div
           key={video.id}
-          className="h-screen w-full snap-start snap-always relative"
+          className="h-screen w-full snap-start snap-always relative overflow-hidden"
         >
-          {/* Only render the current video and adjacent videos to optimize performance */}
+          {/* Only render the current video and adjacent videos (2 in each direction) to optimize performance */}
           {(loadedVideos.has(video.id) ||
             index === activeVideoIndex ||
             index === activeVideoIndex + 1 ||
-            index === activeVideoIndex - 1) && (
+            index === activeVideoIndex + 2 ||
+            index === activeVideoIndex - 1 ||
+            index === activeVideoIndex - 2) && (
             <VideoPlayer
               video={video}
               isActive={index === activeVideoIndex}

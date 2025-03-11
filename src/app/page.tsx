@@ -6,7 +6,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black">
-      <div className="h-screen w-full max-w-[500px] mx-auto">
+      <div className="h-screen w-full max-w-[500px] mx-auto relative">
         <VideoFeed videos={videos} />
       </div>
     </main>
