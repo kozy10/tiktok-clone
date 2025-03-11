@@ -3,9 +3,9 @@ import { getVideoById } from "@/lib/data/videos";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const videoId = params.id;
+  const { id: videoId } = await params;
   const video = getVideoById(videoId);
 
   if (!video || !video.previewUrl) {

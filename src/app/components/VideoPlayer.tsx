@@ -10,6 +10,8 @@ interface VideoPlayerProps {
   onLoad?: () => void;
   prevVideo?: VideoType;
   nextVideo?: VideoType;
+  isScrolling?: boolean;
+  scrollDirection?: "up" | "down" | null;
 }
 
 export default function VideoPlayer({
@@ -18,6 +20,8 @@ export default function VideoPlayer({
   onLoad,
   prevVideo,
   nextVideo,
+  isScrolling = false,
+  scrollDirection = null,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const prevVideoRef = useRef<HTMLVideoElement>(null);
@@ -27,6 +31,71 @@ export default function VideoPlayer({
   const [showPreview, setShowPreview] = useState(!!video.previewUrl);
   const [isBufferingNext, setIsBufferingNext] = useState(false);
   const [fadeOutPreview, setFadeOutPreview] = useState(false);
+
+  // スクロール中の動画準備
+  useEffect(() => {
+    // スクロール中で、下方向にスクロールしている場合、次の動画を準備
+    if (
+      isScrolling &&
+      scrollDirection === "down" &&
+      nextVideo &&
+      nextVideoRef.current
+    ) {
+      setIsBufferingNext(true);
+
+      // 次の動画のバッファリングを強化
+      nextVideoRef.current.preload = "auto";
+
+      // 少しだけ再生して止める（バッファリングを促進）
+      const bufferNextVideo = async () => {
+        try {
+          nextVideoRef.current!.currentTime = 0;
+          await nextVideoRef.current!.play();
+          // 少し再生したら一時停止
+          setTimeout(() => {
+            if (nextVideoRef.current) {
+              nextVideoRef.current.pause();
+              nextVideoRef.current.currentTime = 0;
+            }
+          }, 100);
+        } catch (error) {
+          console.error("Error buffering next video during scroll:", error);
+        }
+      };
+
+      bufferNextVideo();
+    }
+
+    // スクロール中で、上方向にスクロールしている場合、前の動画を準備
+    if (
+      isScrolling &&
+      scrollDirection === "up" &&
+      prevVideo &&
+      prevVideoRef.current
+    ) {
+      // 前の動画のバッファリングを強化
+      prevVideoRef.current.preload = "auto";
+
+      // 少しだけ再生して止める（バッファリングを促進）
+      const bufferPrevVideo = async () => {
+        try {
+          prevVideoRef.current!.currentTime = 0;
+          await prevVideoRef.current!.play();
+          // 少し再生したら一時停止
+          setTimeout(() => {
+            if (prevVideoRef.current) {
+              prevVideoRef.current.pause();
+              prevVideoRef.current.currentTime = 0;
+            }
+          }, 100);
+        } catch (error) {
+          console.error("Error buffering previous video during scroll:", error);
+        }
+      };
+
+      bufferPrevVideo();
+    }
+  }, [isScrolling, scrollDirection, nextVideo, prevVideo]);
 
   // 動画の読み込みを最適化
   useEffect(() => {
@@ -39,6 +108,7 @@ export default function VideoPlayer({
       // 非アクティブになったらプレビュー状態をリセット
       setFadeOutPreview(false);
       setShowPreview(!!video.previewUrl);
+      setIsBufferingNext(false);
     } else {
       videoElement.preload = "auto";
 
@@ -185,6 +255,65 @@ export default function VideoPlayer({
       onLoad();
     }
   };
+
+  // スクロール方向に基づいて次/前の動画を事前に再生準備
+  useEffect(() => {
+    // スクロール中で、かつアクティブな動画の場合のみ処理
+    if (!isActive || !isScrolling) return;
+
+    // 下方向スクロール時は次の動画を準備
+    if (scrollDirection === "down" && nextVideo) {
+      // 次の動画が表示される可能性が高いので、より積極的にプリロード
+      const nextVideoElement = nextVideoRef.current;
+      if (nextVideoElement) {
+        nextVideoElement.preload = "auto";
+        nextVideoElement.load();
+
+        // 次の動画が表示される直前に再生準備を開始
+        const prepareNextVideo = async () => {
+          try {
+            // 少しだけ再生して止める（バッファリングを促進）
+            nextVideoElement.currentTime = 0;
+            await nextVideoElement.play();
+            setTimeout(() => {
+              nextVideoElement.pause();
+              nextVideoElement.currentTime = 0;
+            }, 50);
+          } catch (error) {
+            console.error("Error preparing next video:", error);
+          }
+        };
+
+        prepareNextVideo();
+      }
+    }
+
+    // 上方向スクロール時は前の動画を準備
+    if (scrollDirection === "up" && prevVideo) {
+      const prevVideoElement = prevVideoRef.current;
+      if (prevVideoElement) {
+        prevVideoElement.preload = "auto";
+        prevVideoElement.load();
+
+        // 前の動画が表示される直前に再生準備を開始
+        const preparePrevVideo = async () => {
+          try {
+            // 少しだけ再生して止める（バッファリングを促進）
+            prevVideoElement.currentTime = 0;
+            await prevVideoElement.play();
+            setTimeout(() => {
+              prevVideoElement.pause();
+              prevVideoElement.currentTime = 0;
+            }, 50);
+          } catch (error) {
+            console.error("Error preparing previous video:", error);
+          }
+        };
+
+        preparePrevVideo();
+      }
+    }
+  }, [isActive, isScrolling, scrollDirection, nextVideo, prevVideo]);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-transparent">

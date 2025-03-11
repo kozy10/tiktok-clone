@@ -21,6 +21,11 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
   });
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down" | null>(
+    null
+  );
+  const [isScrolling, setIsScrolling] = useState(false);
+  const lastScrollTopRef = useRef(0);
 
   // Scroll detection and active video determination
   useEffect(() => {
@@ -28,6 +33,16 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
     if (!feedContainer) return;
 
     const handleScroll = () => {
+      // スクロール方向を検出
+      const currentScrollTop = feedContainer.scrollTop;
+      const direction =
+        currentScrollTop > lastScrollTopRef.current ? "down" : "up";
+      lastScrollTopRef.current = currentScrollTop;
+
+      // スクロール中フラグを設定
+      setIsScrolling(true);
+      setScrollDirection(direction);
+
       // スクロール中は頻繁な状態更新を避けるためにデバウンス
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
@@ -60,6 +75,9 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
             }
           }
         }
+
+        // スクロール終了後、スクロール中フラグをリセット
+        setIsScrolling(false);
       }, 100); // 100msのデバウンス
     };
 
@@ -125,6 +143,8 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
                 onLoad={() => handleVideoLoad(video.id)}
                 prevVideo={getPrevVideo(index)}
                 nextVideo={getNextVideo(index)}
+                isScrolling={isScrolling}
+                scrollDirection={scrollDirection}
               />
             )}
           </div>
