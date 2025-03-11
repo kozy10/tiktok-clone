@@ -10,21 +10,16 @@ interface VideoFeedProps {
 
 export default function VideoFeed({ videos }: VideoFeedProps) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const [loadedVideos, setLoadedVideos] = useState<Set<string>>(() => {
-    // 初期ロード時により多くの動画をプリロード
-    const initialLoadedVideos = new Set<string>();
-    // 最初の3つの動画を初期ロード時にプリロード
-    for (let i = 0; i < Math.min(3, videos.length); i++) {
-      if (videos[i]?.id) initialLoadedVideos.add(videos[i].id);
-    }
-    return initialLoadedVideos;
-  });
   const [preloadedImages, setPreloadedImages] = useState<Set<string>>(
+    new Set()
+  );
+  const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(
     new Set()
   );
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastScrollTopRef = useRef(0);
+  const videoElementsRef = useRef<Record<string, HTMLVideoElement>>({});
 
   // プレビュー画像をプリロードする関数
   const preloadImage = (imageUrl: string) => {
@@ -37,22 +32,79 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
     };
   };
 
-  // 次の動画のプレビュー画像をプリロード
+  // 動画をプリロードする関数
+  const preloadVideo = (videoUrl: string, videoId: string) => {
+    if (!videoUrl || preloadedVideos.has(videoUrl)) return;
+
+    // 既存の動画要素があれば再利用し、なければ新規作成
+    let videoElement = videoElementsRef.current[videoId];
+
+    if (!videoElement) {
+      videoElement = document.createElement("video");
+      videoElement.preload = "auto";
+      videoElement.muted = true;
+      videoElement.playsInline = true;
+      videoElement.style.display = "none";
+      videoElementsRef.current[videoId] = videoElement;
+      document.body.appendChild(videoElement);
+    }
+
+    // 新しいsrcをセット
+    videoElement.src = videoUrl;
+
+    // データをプリロード
+    videoElement.load();
+
+    // プリロード済みとしてマーク
+    setPreloadedVideos((prev) => new Set([...prev, videoUrl]));
+  };
+
+  // 動画リソースを解放する関数（メモリ管理のため）
+  const releaseVideo = (videoId: string) => {
+    const videoElement = videoElementsRef.current[videoId];
+    if (videoElement) {
+      videoElement.src = "";
+      document.body.removeChild(videoElement);
+      delete videoElementsRef.current[videoId];
+    }
+  };
+
+  // 前後の動画のプリロード
   useEffect(() => {
-    // アクティブな動画が変わったら、次の動画のプレビュー画像をプリロード
+    // アクティブな動画が変わったら、前後の動画をプリロード
     if (activeVideoIndex >= 0) {
-      // 次の3つの動画のプレビュー画像をプリロード
-      for (let i = 1; i <= 3; i++) {
+      // 前の2つの動画をプリロード
+      for (let i = 1; i <= 2; i++) {
+        if (activeVideoIndex - i >= 0) {
+          const prevVideo = videos[activeVideoIndex - i];
+          if (prevVideo.previewUrl) {
+            preloadImage(prevVideo.previewUrl);
+          }
+          if (prevVideo.url) {
+            preloadVideo(prevVideo.url, prevVideo.id);
+          }
+        }
+      }
+
+      // 次の2つの動画をプリロード
+      for (let i = 1; i <= 2; i++) {
         if (activeVideoIndex + i < videos.length) {
           const nextVideo = videos[activeVideoIndex + i];
           if (nextVideo.previewUrl) {
             preloadImage(nextVideo.previewUrl);
           }
-          if (nextVideo.coverImage) {
-            preloadImage(nextVideo.coverImage);
+          if (nextVideo.url) {
+            preloadVideo(nextVideo.url, nextVideo.id);
           }
         }
       }
+
+      // 現在の動画から遠い動画のリソースを解放（メモリ管理のため）
+      videos.forEach((video, index) => {
+        if (Math.abs(index - activeVideoIndex) > 3) {
+          releaseVideo(video.id);
+        }
+      });
     }
   }, [activeVideoIndex, videos]);
 
@@ -75,28 +127,27 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
         const containerHeight = feedContainer.clientHeight;
         const containerScrollTop = feedContainer.scrollTop;
 
-        // Calculate the index of the currently displayed video
-        const index = Math.floor(containerScrollTop / containerHeight);
-        if (index !== activeVideoIndex && index >= 0 && index < videos.length) {
-          setActiveVideoIndex(index);
+        // 現在のビューポートに表示されている動画のインデックスを計算
+        const currentIndex = Math.floor(containerScrollTop / containerHeight);
 
-          // より多くの次の動画をプリロード (2つに増加)
-          for (let i = 1; i <= 2; i++) {
-            if (index + i < videos.length) {
-              setLoadedVideos(
-                (prev) => new Set([...prev, videos[index + i].id])
-              );
-            }
-          }
+        // 次のビデオがどのくらい表示されているか計算
+        const nextIndex = currentIndex + 1;
+        const currentVideoVisiblePart =
+          (currentIndex + 1) * containerHeight - containerScrollTop;
+        const currentVideoVisiblePercentage =
+          (currentVideoVisiblePart / containerHeight) * 100;
+        const nextVideoVisiblePercentage = 100 - currentVideoVisiblePercentage;
 
-          // 前の動画もプリロード (1つに増加)
-          for (let i = 1; i <= 1; i++) {
-            if (index - i >= 0) {
-              setLoadedVideos(
-                (prev) => new Set([...prev, videos[index - i].id])
-              );
-            }
-          }
+        // 次の動画が30%以上表示されていれば、次の動画をアクティブにする
+        const targetIndex =
+          nextVideoVisiblePercentage >= 30 ? nextIndex : currentIndex;
+
+        if (
+          targetIndex !== activeVideoIndex &&
+          targetIndex >= 0 &&
+          targetIndex < videos.length
+        ) {
+          setActiveVideoIndex(targetIndex);
         }
       }, 100); // 100msのデバウンス
     };
@@ -113,55 +164,6 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
     };
   }, [activeVideoIndex, videos]);
 
-  // Callback when a video is loaded
-  const handleVideoLoad = (videoId: string) => {
-    setLoadedVideos((prev) => new Set([...prev, videoId]));
-  };
-
-  // 前後の動画を取得する関数
-  const getPrevVideo = (index: number): Video | undefined => {
-    return index > 0 ? videos[index - 1] : undefined;
-  };
-
-  const getNextVideo = (index: number): Video | undefined => {
-    return index < videos.length - 1 ? videos[index + 1] : undefined;
-  };
-
-  // 表示すべき動画かどうかを判定する関数
-  const shouldRenderVideo = (index: number): boolean => {
-    // アクティブな動画の後ろ2つ前1つまでの動画を表示
-    const isNearActive =
-      index === activeVideoIndex ||
-      index === activeVideoIndex + 1 ||
-      index === activeVideoIndex + 2 ||
-      index === activeVideoIndex - 1;
-
-    // すでにロード済みの動画も表示
-    return isNearActive || loadedVideos.has(videos[index].id);
-  };
-
-  // プリロードする動画の数を増やす
-  useEffect(() => {
-    // アクティブな動画が変わったら、次の動画をプリロード
-    if (activeVideoIndex >= 0) {
-      // 次の3つの動画をプリロード
-      for (let i = 1; i <= 3; i++) {
-        if (activeVideoIndex + i < videos.length) {
-          setLoadedVideos(
-            (prev) => new Set([...prev, videos[activeVideoIndex + i].id])
-          );
-        }
-      }
-
-      // 前の1つの動画もプリロード
-      if (activeVideoIndex - 1 >= 0) {
-        setLoadedVideos(
-          (prev) => new Set([...prev, videos[activeVideoIndex - 1].id])
-        );
-      }
-    }
-  }, [activeVideoIndex, videos]);
-
   return (
     <div
       ref={feedContainerRef}
@@ -173,38 +175,11 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
           className="h-screen w-full snap-start snap-always relative overflow-hidden flex items-center justify-center bg-transparent"
         >
           <div className="w-full h-full max-w-[500px] mx-auto bg-transparent">
-            {shouldRenderVideo(index) && (
-              <>
-                {/* 前の動画 */}
-                {index === activeVideoIndex && getPrevVideo(index) && (
-                  <div className="hidden">
-                    <VideoPlayer
-                      video={getPrevVideo(index)!}
-                      isActive={false}
-                      onLoad={() => handleVideoLoad(getPrevVideo(index)!.id)}
-                    />
-                  </div>
-                )}
-
-                {/* 現在の動画 */}
-                <VideoPlayer
-                  video={video}
-                  isActive={index === activeVideoIndex}
-                  onLoad={() => handleVideoLoad(video.id)}
-                />
-
-                {/* 次の動画 */}
-                {index === activeVideoIndex && getNextVideo(index) && (
-                  <div className="hidden">
-                    <VideoPlayer
-                      video={getNextVideo(index)!}
-                      isActive={false}
-                      onLoad={() => handleVideoLoad(getNextVideo(index)!.id)}
-                    />
-                  </div>
-                )}
-              </>
-            )}
+            <VideoPlayer
+              video={video}
+              isActive={index === activeVideoIndex}
+              isPreloaded={video.url ? preloadedVideos.has(video.url) : false}
+            />
           </div>
         </div>
       ))}

@@ -7,13 +7,14 @@ import Image from "next/image";
 interface VideoPlayerProps {
   video: VideoType;
   isActive: boolean;
+  isPreloaded?: boolean;
   onLoad?: () => void;
 }
 
 export default function VideoPlayer({
   video,
   isActive,
-  onLoad,
+  isPreloaded = false,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -33,23 +34,11 @@ export default function VideoPlayer({
       setIsLoaded(false);
       setIsPlaying(false);
     } else {
+      setShowPreview(true);
       videoElement.preload = "auto";
-
       // モバイルでの自動再生を強制
       videoElement.load();
     }
-  }, [isActive]);
-
-  // プレビュー動画の管理
-  useEffect(() => {
-    if (!isActive) return;
-
-    // アクティブになったときにプレビュー画像を表示
-    setShowPreview(true);
-
-    return () => {
-      // 非アクティブになったときにクリーンアップ
-    };
   }, [isActive]);
 
   // メイン動画の再生管理
@@ -58,23 +47,11 @@ export default function VideoPlayer({
     if (!videoElement) return;
 
     if (isActive) {
-      // 再生を試みる前に、動画が十分に読み込まれているか確認
-      if (videoElement.readyState >= 3) {
-        // HAVE_FUTURE_DATA以上の状態
+      // 動画がプリロードされている場合、すぐに再生を試みる
+      if (isPreloaded && videoElement.readyState >= 3) {
         playVideo(videoElement);
       } else {
-        // まだ十分なデータがない場合は、データが来るのを待つ
-        const handleCanPlay = () => {
-          // 少し遅延させて再生を開始することでバッファリングを確保
-          setTimeout(() => {
-            playVideo(videoElement);
-          }, 100);
-          videoElement.removeEventListener("canplaythrough", handleCanPlay);
-        };
-        videoElement.addEventListener("canplaythrough", handleCanPlay);
-        return () => {
-          videoElement.removeEventListener("canplaythrough", handleCanPlay);
-        };
+        videoElement.load();
       }
     } else {
       videoElement.pause();
@@ -82,7 +59,7 @@ export default function VideoPlayer({
       // Reset to the beginning so it can be played from the start when scrolled back
       videoElement.currentTime = 0;
     }
-  }, [isActive]);
+  }, [isActive, isPreloaded]);
 
   // 動画再生を試みる関数
   const playVideo = async (videoElement: HTMLVideoElement) => {
@@ -112,42 +89,16 @@ export default function VideoPlayer({
         playVideo(videoRef.current);
       }
     }
-
-    if (onLoad) {
-      onLoad();
-    }
-  };
-
-  // プレビュー画像またはカバー画像のURLを取得
-  const getPreviewImageUrl = () => {
-    return video.previewUrl || video.coverImage;
   };
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-transparent">
       <div className="relative w-[80%] h-[80%] overflow-hidden rounded-2xl shadow-lg">
-        {/* サムネイルプレビュー (動画が読み込まれるまで表示) */}
-        {!isPlaying && video.coverImage && (
-          <div className="absolute inset-0 z-0">
-            <Image
-              src={video.coverImage}
-              alt={video.description || "Video thumbnail"}
-              fill
-              sizes="100vw"
-              style={{ objectFit: "cover" }}
-              priority={isActive}
-              placeholder="blur"
-              blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QOQvhAAAAABJRU5ErkJggg=="
-              className="rounded-2xl"
-            />
-          </div>
-        )}
-
         {/* 低解像度のプレビュー画像 (メイン動画が再生されるまで表示) */}
-        {showPreview && getPreviewImageUrl() && (
+        {showPreview && video.previewUrl && (
           <div className={`absolute inset-0 z-10`}>
             <Image
-              src={getPreviewImageUrl()!}
+              src={video.previewUrl!}
               alt={video.description || "Video preview"}
               fill
               sizes="100vw"
@@ -193,8 +144,8 @@ export default function VideoPlayer({
           <p className="text-xs text-gray-300 max-w-[90%]">{video.url}</p>
         </div>
 
-        {/* Loading indicator - only show if no preview or cover image is available */}
-        {!isLoaded && !isPlaying && !getPreviewImageUrl() && (
+        {/* Loading indicator - only show if no preview image is available */}
+        {!isLoaded && !isPlaying && !video.previewUrl && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-10 rounded-2xl">
             <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
           </div>
