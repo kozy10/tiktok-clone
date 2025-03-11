@@ -20,13 +20,13 @@ export default function VideoPlayer({
   nextVideo,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const previewVideoRef = useRef<HTMLVideoElement>(null);
   const prevVideoRef = useRef<HTMLVideoElement>(null);
   const nextVideoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPreview, setShowPreview] = useState(!!video.previewUrl);
   const [isBufferingNext, setIsBufferingNext] = useState(false);
+  const [fadeOutPreview, setFadeOutPreview] = useState(false);
 
   // 動画の読み込みを最適化
   useEffect(() => {
@@ -36,13 +36,16 @@ export default function VideoPlayer({
     // 非アクティブな動画はロード優先度を下げる
     if (!isActive) {
       videoElement.preload = "metadata";
+      // 非アクティブになったらプレビュー状態をリセット
+      setFadeOutPreview(false);
+      setShowPreview(!!video.previewUrl);
     } else {
       videoElement.preload = "auto";
 
       // モバイルでの自動再生を強制
       videoElement.load();
     }
-  }, [isActive]);
+  }, [isActive, video.previewUrl]);
 
   // 前後の動画をプリロード
   useEffect(() => {
@@ -104,22 +107,11 @@ export default function VideoPlayer({
   useEffect(() => {
     if (!video.previewUrl || !isActive) return;
 
-    const previewElement = previewVideoRef.current;
-    if (!previewElement) return;
-
-    // プレビュー動画を即時再生
-    const playPreview = async () => {
-      try {
-        await previewElement.play();
-      } catch (error) {
-        console.error("Error playing preview video:", error);
-      }
-    };
-
-    playPreview();
+    // アクティブになったときにプレビュー画像を表示
+    setShowPreview(true);
 
     return () => {
-      previewElement.pause();
+      // 非アクティブになったときにクリーンアップ
     };
   }, [isActive, video.previewUrl]);
 
@@ -129,19 +121,22 @@ export default function VideoPlayer({
     if (!videoElement) return;
 
     if (isActive) {
-      // 再生を試みる前に、動画が読み込まれているか確認
-      if (videoElement.readyState >= 2) {
-        // HAVE_CURRENT_DATA以上の状態
+      // 再生を試みる前に、動画が十分に読み込まれているか確認
+      if (videoElement.readyState >= 3) {
+        // HAVE_FUTURE_DATA以上の状態
         playVideo(videoElement);
       } else {
         // まだ十分なデータがない場合は、データが来るのを待つ
         const handleCanPlay = () => {
-          playVideo(videoElement);
-          videoElement.removeEventListener("canplay", handleCanPlay);
+          // 少し遅延させて再生を開始することでバッファリングを確保
+          setTimeout(() => {
+            playVideo(videoElement);
+          }, 100);
+          videoElement.removeEventListener("canplaythrough", handleCanPlay);
         };
-        videoElement.addEventListener("canplay", handleCanPlay);
+        videoElement.addEventListener("canplaythrough", handleCanPlay);
         return () => {
-          videoElement.removeEventListener("canplay", handleCanPlay);
+          videoElement.removeEventListener("canplaythrough", handleCanPlay);
         };
       }
     } else {
@@ -159,8 +154,14 @@ export default function VideoPlayer({
     try {
       await videoElement.play();
       setIsPlaying(true);
-      // メイン動画が再生開始したらプレビューを非表示に
-      setShowPreview(false);
+
+      // メイン動画が再生開始したらプレビューをフェードアウト
+      setFadeOutPreview(true);
+
+      // フェードアウト完了後にプレビューを非表示に
+      setTimeout(() => {
+        setShowPreview(false);
+      }, 500); // トランジション時間と同じ
     } catch (error) {
       console.error("Error playing video:", error);
       setIsPlaying(false);
@@ -173,7 +174,11 @@ export default function VideoPlayer({
 
     // 動画がロードされたら、アクティブな場合は自動的に再生を開始
     if (isActive && videoRef.current) {
-      playVideo(videoRef.current);
+      // 動画が十分にバッファリングされてから再生を開始
+      if (videoRef.current.readyState >= 3) {
+        // HAVE_FUTURE_DATA以上
+        playVideo(videoRef.current);
+      }
     }
 
     if (onLoad) {
@@ -201,21 +206,21 @@ export default function VideoPlayer({
           </div>
         )}
 
-        {/* 低解像度のプレビュー動画 (メイン動画が再生されるまで表示) */}
+        {/* 低解像度のプレビュー画像 (メイン動画が再生されるまで表示) */}
         {showPreview && video.previewUrl && (
           <div
-            className={`absolute inset-0 z-1 ${
-              isPlaying ? "opacity-0" : "opacity-100"
-            } transition-opacity duration-300`}
+            className={`absolute inset-0 z-10 ${
+              fadeOutPreview ? "opacity-0" : "opacity-100"
+            } transition-opacity duration-500`}
           >
-            <video
-              ref={previewVideoRef}
-              src={`/api/preview/${video.id}`}
-              className="w-full h-full object-cover rounded-2xl"
-              loop
-              muted
-              playsInline
-              autoPlay
+            <Image
+              src={video.previewUrl}
+              alt={video.description || "Video preview"}
+              fill
+              sizes="100vw"
+              style={{ objectFit: "cover" }}
+              priority={isActive}
+              className="rounded-2xl"
             />
           </div>
         )}
@@ -224,9 +229,9 @@ export default function VideoPlayer({
         <video
           ref={videoRef}
           src={`/api/video/${video.id}`}
-          className={`w-full h-full object-cover rounded-2xl ${
+          className={`w-full h-full object-cover rounded-2xl z-5 ${
             isPlaying ? "opacity-100" : "opacity-0"
-          } transition-opacity duration-300`}
+          } transition-opacity duration-500`}
           loop
           muted
           playsInline

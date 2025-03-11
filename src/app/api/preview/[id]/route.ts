@@ -9,13 +9,19 @@ export async function GET(
   const video = getVideoById(videoId);
 
   if (!video || !video.previewUrl) {
-    return new NextResponse("Preview video not found", { status: 404 });
+    return new NextResponse("Preview image not found", { status: 404 });
   }
 
-  // プレビュー動画のURLをリダイレクト先として設定
-  const response = NextResponse.redirect(video.previewUrl);
+  // プレビュー画像のURLを絶対パスに変換
+  const previewUrl = new URL(
+    video.previewUrl,
+    request.nextUrl.origin
+  ).toString();
 
-  // CloudFlare R2のキャッシュ期間を1年間に設定
+  // プレビュー画像のURLにリダイレクト
+  const response = NextResponse.redirect(previewUrl);
+
+  // キャッシュ期間を1年間に設定
   response.headers.set("Cache-Control", "public, max-age=31536000, immutable");
 
   return response;
