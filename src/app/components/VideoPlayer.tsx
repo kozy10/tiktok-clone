@@ -16,7 +16,6 @@ export default function VideoPlayer({
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
 
   // 動画の読み込みを最適化
   useEffect(() => {
@@ -28,7 +27,6 @@ export default function VideoPlayer({
       videoElement.preload = isPreloaded ? "auto" : "metadata";
       // 非アクティブになったらプレビュー状態をリセット
       setIsLoaded(false);
-      setIsPlaying(false);
     } else {
       videoElement.preload = "auto";
       // モバイルでの自動再生を強制
@@ -40,15 +38,44 @@ export default function VideoPlayer({
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement) return;
+    console.log("Current readyState:", videoElement.readyState);
+
+    // 動画のロード状態が変化したときに再生を試みる関数
+    const handleCanPlay = () => {
+      if (isActive && videoElement.readyState >= 3) {
+        console.log("Video can play, readyState:", videoElement.readyState);
+        videoElement
+          .play()
+          .then(() => {
+            console.log("Video playback started successfully");
+            setIsLoaded(true);
+          })
+          .catch((error) => {
+            console.error("Error playing video:", error);
+          });
+      }
+    };
 
     if (isActive) {
-      videoElement.play();
+      // 読み込み状態のイベントリスナーを追加
+      videoElement.addEventListener("canplay", handleCanPlay);
+
+      // すでに読み込み完了状態なら再生を試みる
+      if (videoElement.readyState >= 3) {
+        handleCanPlay();
+      } else {
+        videoElement.load();
+      }
     } else {
       videoElement.pause();
-      setIsPlaying(false);
       // Reset to the beginning so it can be played from the start when scrolled back
       videoElement.currentTime = 0;
     }
+
+    // クリーンアップ関数
+    return () => {
+      videoElement.removeEventListener("canplay", handleCanPlay);
+    };
   }, [isActive]);
 
   return (
@@ -87,7 +114,7 @@ export default function VideoPlayer({
         </div>
 
         {/* Loading indicator - only show if no preview image is available */}
-        {!isLoaded && !isPlaying && !video.previewUrl && (
+        {!isLoaded && !video.previewUrl && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-10 rounded-2xl">
             <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
           </div>
