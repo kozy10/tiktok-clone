@@ -2,6 +2,14 @@ import { Video } from "./types";
 
 export const videos: Video[] = [
   {
+    id: "0",
+    url: "https://kentarokojima.com/tiktok-clone/video22.mp4",
+    previewUrl: "/previews/preview-9.jpg",
+    description: "Stunning waterfall in the jungle #waterfall #jungle #travel",
+    userName: "adventure_seeker",
+    userAvatar: "https://picsum.photos/id/91/200",
+  },
+  {
     id: "1",
     url: "https://kentarokojima.com/tiktok-clone/video3.mp4",
     previewUrl: "/previews/preview-1.jpg",
@@ -17,14 +25,6 @@ export const videos: Video[] = [
     userName: "urban_explorer",
     userAvatar: "https://picsum.photos/id/65/200",
   },
-  // {
-  //   id: "3",
-  //   url: "https://kentarokojima.com/tiktok-clone/video5.mp4",
-  //   previewUrl: "/previews/preview-3.jpg",
-  //   description: "Beach waves #beach #ocean #summer",
-  //   userName: "beach_life",
-  //   userAvatar: "https://picsum.photos/id/68/200",
-  // },
   {
     id: "4",
     url: "https://kentarokojima.com/tiktok-clone/video6.mp4",
@@ -40,38 +40,6 @@ export const videos: Video[] = [
     description: "Cooking a new recipe #food #cooking",
     userName: "food_lover",
     userAvatar: "https://picsum.photos/id/23/200",
-  },
-  // {
-  //   id: "6",
-  //   url: "https://kentarokojima.com/tiktok-clone/video8.mp4",
-  //   previewUrl: "/previews/preview-6.jpg",
-  //   description: "Beautiful mountain lake view #nature #lake #mountains",
-  //   userName: "nature_explorer",
-  //   userAvatar: "https://picsum.photos/id/29/200",
-  // },
-  // {
-  //   id: "7",
-  //   url: "https://kentarokojima.com/tiktok-clone/video9.mp4",
-  //   previewUrl: "/previews/preview-7.jpg",
-  //   description: "Peaceful forest stream #forest #stream #nature",
-  //   userName: "wilderness_lover",
-  //   userAvatar: "https://picsum.photos/id/42/200",
-  // },
-  // {
-  //   id: "8",
-  //   url: "https://kentarokojima.com/tiktok-clone/video10.mp4",
-  //   previewUrl: "/previews/preview-8.jpg",
-  //   description: "Stunning waterfall in the jungle #waterfall #jungle #travel",
-  //   userName: "adventure_seeker",
-  //   userAvatar: "https://picsum.photos/id/91/200",
-  // },
-  {
-    id: "9",
-    url: "https://kentarokojima.com/tiktok-clone/video22.mp4",
-    previewUrl: "/previews/preview-9.jpg",
-    description: "Stunning waterfall in the jungle #waterfall #jungle #travel",
-    userName: "adventure_seeker",
-    userAvatar: "https://picsum.photos/id/91/200",
   },
   {
     id: "10",
