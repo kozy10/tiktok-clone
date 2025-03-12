@@ -12,6 +12,7 @@ interface VideoPlayerProps {
 export default function VideoPlayer({
   video,
   isActive,
+  isPreloaded = false,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -24,7 +25,7 @@ export default function VideoPlayer({
 
     // 非アクティブな動画はロード優先度を下げる
     if (!isActive) {
-      videoElement.preload = "metadata";
+      videoElement.preload = isPreloaded ? "auto" : "metadata";
       // 非アクティブになったらプレビュー状態をリセット
       setIsLoaded(false);
       setIsPlaying(false);
@@ -33,14 +34,16 @@ export default function VideoPlayer({
       // モバイルでの自動再生を強制
       videoElement.load();
     }
-  }, [isActive]);
+  }, [isActive, isPreloaded]);
 
   // メイン動画の再生管理
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement) return;
 
-    if (!isActive) {
+    if (isActive) {
+      videoElement.play();
+    } else {
       videoElement.pause();
       setIsPlaying(false);
       // Reset to the beginning so it can be played from the start when scrolled back
@@ -51,17 +54,15 @@ export default function VideoPlayer({
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-transparent">
       <div className="relative w-[80%] h-[80%] overflow-hidden rounded-2xl shadow-lg">
-        {/* メイン動画 */}
         <video
           ref={videoRef}
-          src={`/api/video/${video.id}`}
+          src={video.url}
           className={`w-full h-full object-cover rounded-2xl`}
           loop
           muted
-          autoPlay={isActive}
           playsInline
           poster={video.previewUrl}
-          preload={isActive ? "auto" : "metadata"}
+          preload={isActive ? "auto" : isPreloaded ? "auto" : "none"}
         />
 
         {/* User information and video description */}

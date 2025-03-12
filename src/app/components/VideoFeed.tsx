@@ -10,103 +10,9 @@ interface VideoFeedProps {
 
 export default function VideoFeed({ videos }: VideoFeedProps) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(
-    new Set()
-  );
-  const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(
-    new Set()
-  );
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastScrollTopRef = useRef(0);
-  const videoElementsRef = useRef<Record<string, HTMLVideoElement>>({});
-
-  // プレビュー画像をプリロードする関数
-  const preloadImage = (imageUrl: string) => {
-    if (!imageUrl || preloadedImages.has(imageUrl)) return;
-
-    const img = new window.Image();
-    img.src = imageUrl;
-    img.onload = () => {
-      setPreloadedImages((prev) => new Set([...prev, imageUrl]));
-    };
-  };
-
-  // 動画をプリロードする関数
-  const preloadVideo = (videoUrl: string, videoId: string) => {
-    if (!videoUrl || preloadedVideos.has(videoUrl)) return;
-
-    // 既存の動画要素があれば再利用し、なければ新規作成
-    let videoElement = videoElementsRef.current[videoId];
-
-    if (!videoElement) {
-      videoElement = document.createElement("video");
-      videoElement.preload = "auto";
-      videoElement.muted = true;
-      videoElement.playsInline = true;
-      videoElement.style.display = "none";
-      videoElementsRef.current[videoId] = videoElement;
-      document.body.appendChild(videoElement);
-    }
-
-    // 新しいsrcをセット
-    videoElement.src = videoUrl;
-
-    // データをプリロード
-    videoElement.load();
-
-    // プリロード済みとしてマーク
-    setPreloadedVideos((prev) => new Set([...prev, videoUrl]));
-  };
-
-  // 動画リソースを解放する関数（メモリ管理のため）
-  const releaseVideo = (videoId: string) => {
-    const videoElement = videoElementsRef.current[videoId];
-    if (videoElement) {
-      videoElement.src = "";
-      document.body.removeChild(videoElement);
-      delete videoElementsRef.current[videoId];
-    }
-  };
-
-  // 前後の動画のプリロード
-  useEffect(() => {
-    // アクティブな動画が変わったら、前後の動画をプリロード
-    if (activeVideoIndex >= 0) {
-      // 前の2つの動画をプリロード
-      for (let i = 1; i <= 2; i++) {
-        if (activeVideoIndex - i >= 0) {
-          const prevVideo = videos[activeVideoIndex - i];
-          if (prevVideo.previewUrl) {
-            preloadImage(prevVideo.previewUrl);
-          }
-          if (prevVideo.url) {
-            preloadVideo(prevVideo.url, prevVideo.id);
-          }
-        }
-      }
-
-      // 次の2つの動画をプリロード
-      for (let i = 1; i <= 2; i++) {
-        if (activeVideoIndex + i < videos.length) {
-          const nextVideo = videos[activeVideoIndex + i];
-          if (nextVideo.previewUrl) {
-            preloadImage(nextVideo.previewUrl);
-          }
-          if (nextVideo.url) {
-            preloadVideo(nextVideo.url, nextVideo.id);
-          }
-        }
-      }
-
-      // 現在の動画から遠い動画のリソースを解放（メモリ管理のため）
-      videos.forEach((video, index) => {
-        if (Math.abs(index - activeVideoIndex) > 3) {
-          releaseVideo(video.id);
-        }
-      });
-    }
-  }, [activeVideoIndex, videos]);
 
   // Scroll detection and active video determination
   useEffect(() => {
@@ -178,7 +84,7 @@ export default function VideoFeed({ videos }: VideoFeedProps) {
             <VideoPlayer
               video={video}
               isActive={index === activeVideoIndex}
-              isPreloaded={video.url ? preloadedVideos.has(video.url) : false}
+              isPreloaded={index === activeVideoIndex + 1}
             />
           </div>
         </div>
